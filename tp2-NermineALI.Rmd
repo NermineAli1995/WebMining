@@ -1,0 +1,125 @@
+---
+title: 'TP2 - Web Mining: Analyse fichier log  '
+author: "Nermine Ali"
+output:
+  html_document: default 
+  pdf_document: default
+---
+```{r}
+
+library(bupaR)
+
+library(edeaR)
+library(processmapR)
+library(eventdataR)
+library(readr)
+library(tidyverse)
+library(DiagrammeR)
+library(ggplot2)
+library(stringr)
+library(lubridate)
+```
+
+```{r}
+data <- read.csv('C:/credit_file.csv', header = T)
+summary(data)
+
+```
+
+###
+On peut voir les differentes modalités des variables du fichier log 'credit file'. Par exemple, les modalités les plus fréquentes du feature Activity sont  O_Create Offer, O_Created, O_Sent (mail and online), A_Validating, W_Validate application, A_Accepted et autres.
+
+##Conversion des champs date:
+
+Pour aboutir à un fichier event log, nous aurons besoin de convertir les champs starttimesstamp et endtimestamp sous format Datetime.
+```{r}
+data$starttimestamp = as.POSIXct(data$`Start_Timestamp`,
+                                 format = "%Y/%m/%d %H:%M:%S")
+```
+
+```{r}
+data$endtimestamp = as.POSIXct(data$`Complete_Timestamp`, format = "%Y/%m/%d %H:%M:%S")
+
+```
+
+##Event log:
+Nous avons utilis? deux manières pour la création du fichier event.
+
+### Premi?re m?thode:
+
+```{r}
+
+events <- bupaR::activities_to_eventlog(
+  head(data, n = 10000),
+  case_id = 'Case_ID',
+  activity_id = 'Activity',
+  resource_id = 'Resource',
+  timestamps = c('starttimestamp', 'endtimestamp')
+)
+
+```
+
+###Deuxi?me m?thode:
+
+```{r}
+events <- bupaR::activities_to_eventlog(
+  data,
+  case_id = 'Case_ID',
+  activity_id = 'Activity',
+  resource_id = 'Resource',
+  timestamps = c('starttimestamp', 'endtimestamp')
+)
+
+```
+
+```{r}
+
+summary(events)
+
+```
+
+
+#Fréquence des évenements:
+```{r}
+events %>%
+  activity_frequency(level = "activity") %>%
+  plot()
+
+```
+
+Nous pouvons voir les émails envoyés (O_send) et ceux créé par un offre ou non ont la méme fréquence qui est de l'ordre de 12.5 car dans n'importante quelle cr?ation de compte, tous les utilisateurs vont passer par les mémés étapes c'est à dire phase de creation de la demande d'où sa fréquence élévée. 
+Nous remarquons de plus d'acception, d'inscription et formulaire complet sont les memes alors que ceux du refus sont moins fréquent (refused ou denied).
+
+##Traces des activités:
+
+Les fonctions de tracé génériques peuvent être utilisées pour créer des graphiques prédéfinis, pouvant être personnalisés à l'aide de ggplot2.
+```{r}
+events %>% 
+  trace_explorer(coverage = 0.9)
+
+```
+
+
+
+```{r}
+events %>%
+ filter_trace_frequency(perc = 0.9) %>%
+ process_map()
+
+```
+
+```{r}
+events %>% 
+ dotted_chart
+```
+
+
+Le graphique en pointillé personnalisable montre tous les événements par heure. Les relations de priorité entre les activités sont claires: c'est à dire au début on peut voir l'inscription puis le formulaire complet(A_submetted puis Complete application ) Janvier 01 puis les formulaires validés entre le 10 Janvier et fin Janvier puis s'il existe un refus (Denied ) Après le premier Février.
+
+
+
+
+##Conclusion:
+
+Nous avons pu analyser un fichier log lié au crédit bancaire des clients afin de pouvoir analyser les activités de ces derniers dans le processus de demande de crédit bancaires. Nous avons utiliser les données présentes comme l'id, type d'activités, le debut et la fin des activités pour analyser les fréquences et les interpréter grace aux outils de visualisation.
+
